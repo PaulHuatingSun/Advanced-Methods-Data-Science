@@ -1,0 +1,252 @@
+---
+title: "Estimating Causal Effect with BA and CS Method"
+author: "Huating Sun"
+date: "4/9/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Graphical exploration (20 pt)
+
+```{r, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(readr)
+```
+
+    1. (4pt) Load data. How many cases do we have? How many different villages? How many cases of poor in progresa villages?
+
+```{r}
+# Load the data
+progresa_data <- read_csv("C:/Users/pauls/Desktop/Info_371/data/progresa-sample.csv", show_col_types = FALSE)
+# Compute required information
+print(paste("There are", nrow(progresa_data), "cases in the dataset"))
+diff_village <- length(unique(progresa_data$village))
+print(paste("There are", diff_village, "different villages in the dataset"))
+poor_progresa <- progresa_data %>%
+  filter(progresa == "basal", poor == "pobre") 
+print(paste("There are", nrow(poor_progresa), "cases of poor in progresa villages"))
+```
+
+    2. (4pt) Compute average schooling rate of poor household by villages (you can use village id as the grouping variable) for 1997 and 1998. Compare it between progresa villages, and in non-progresa villages in 1997 and 1998. Here just report the averages, you’ll do a graphical comparison of distributions below.
+    Note: this asks you to compare the schooling rate by village, i.e. you need a single number (avg schooling rate) for each village. Thereafter, you should compare averages of village averages.
+    
+```{r}
+# Compute the average schooling rate of poor household by villages for 1997 and 1998
+avg_schooling <- progresa_data %>% 
+  filter(poor == "pobre") %>% 
+  group_by(village, year, progresa) %>% 
+  summarize(mean_sc = mean(sc, na.rm = TRUE))
+# Find data for year 1997
+poor_schooling_97 <- avg_schooling %>%
+  filter(year == 97)
+# Find data for year 1998
+poor_schooling_98 <- avg_schooling %>%
+  filter(year == 98)
+
+print("The average schooling rate for poor in 1997 is:")
+```
+```{r}
+# Print the 1997 dataframe
+print(poor_schooling_97)
+```
+
+```{r}
+print("The average schooling rate for poor in 1998 is:")
+```
+
+```{r}
+# Print the 1998 dataframe
+print(poor_schooling_98)
+```
+
+    3. (4pt) Display the average schooling rate before the program (1997) separately for progresa/non-progresa villages. Mark sample average rate (separately for progresa/non-progresa villages) on the figure. Attempt to overlay these density estimates. You can try to replicate this example.
+    
+```{r}
+# Create a density plot that displays the average schooling rate before the program
+ggplot(data = poor_schooling_97, aes(x = mean_sc, fill = progresa)) +
+  geom_density(alpha = 0.3) +
+  labs(title = "Schooling Rate 1997 in Progresa/Non-Progresa Villages",
+       x = "Schooling",
+       y = "Density") +
+  scale_fill_discrete(name = "Treatment", labels = c("No Progresa", "Progresa")) +
+  geom_vline(aes(xintercept = mean(mean_sc)))
+```
+  
+    4. (4pt) Repeat for the program year (1998)
+    
+```{r}
+# Create a density plot that displays the average schooling rate after the program
+ggplot(data = poor_schooling_98, aes(x = mean_sc, fill = progresa)) +
+  geom_density(alpha = 0.3) +
+  labs(title = "Schooling Rate 1998 in Progresa/Non-Progresa Villages",
+       x = "Schooling",
+       y = "Density") +
+  scale_fill_discrete(name = "Treatment", labels = c("No Progresa", "Progresa")) +
+  geom_vline(aes(xintercept = mean(mean_sc)))
+```
+    
+    5. (4pt) Comment the results. Do the distributions look similar? Do you see the schooling rate in progresa villages increasing over that of the control villages?
+
+For both progresa villages and non-progresa villages, the majority of the schooling rate are between 0.7 and 0.9. For the progresa group, it appears that more villages have higher schooling rate in 1998 than in 1997 (before the progresa program). Both graphs are rather similar, as both progresa and non-progresa groups graphs are left-skewed. It does appear that over time, the progresa group graph has become more left-skewed than before. 
+
+In 1997, it appears that the schooling rate in progresa villages increasing over that of the control villages at schooling rate of 0.86. In 1998, it appears that the schooling rate in progresa villages increasing over that of the control villages at schooling rate of 0.81.
+
+# Cross-sectional (CS) estimator (40pt)
+
+CS estimator compares data for treated (poor in progresa villages) and non-treated controls (poor
+in non-progresa villages) after the treatment (i.e. 1998). We start with a simple table.
+
+    1. (3pt) What is the identifying assumption behind this CS estimator? Do you think these are satisfied here? Explain!
+    Hint: see lecture notes Ch 5.5.1 “Counterfactual and Identifying Assumption” and 5.5.2 “A Few Popular Estimators”.
+    
+The underlying assumption is that E[ϵ|village == progresa] = E[ϵ|village == non-progresa]. We assume that the error term is unrelated to whether the village has progresa program or not. In other words, we are assuming that there is no systematic difference in schooling between progresa and non-progresa villages. Under this assumption, the only difference between the villages is whether or not they had the progresa program. Thus, the difference in schooling can be viewed as caused by the progresa program.
+    
+    2. (3pt) Why do we look at only poor households, and only year 1998?
+    
+We are only looking at the poor households because the progresa program is only available for poor families. We look at the year 1998 because we are using cross-sectional estimator, which is that we assume that there is no systematic difference in schooling between progresa and non-progresa villages. We are trying to see the difference between progresa and non-progresa villages after receiving the progresa program in 1998.
+    
+    3. (4pt) compute average schooling rate (variable sc) for treated and non-treated controls after the program. Compare these means. How big effect do you find?
+    Hint: it should be 3.88 pct points.
+    
+```{r}
+# Compute the average schooling rate for the treated group
+avg_sc_treated_98 <- progresa_data %>%
+  filter(poor == "pobre", year == 98, progresa == "basal") %>%
+  summarise(mean = mean(sc, na.rm = T))
+# Compute the average schooling rate for the non-treated group
+avg_sc_non_treated_98 <- progresa_data %>%
+  filter(poor == "pobre", year == 98, progresa == 0) %>%
+  summarise(mean = mean(sc, na.rm = T))
+# Calculate the difference
+effect <- (avg_sc_treated_98 - avg_sc_non_treated_98)*100
+
+print(paste("The effect is:", effect))
+```
+After calculation, the effect is about 3.88 which is the difference in percentage points between treated and non-treated average schooling rates in 1998.
+
+    4. (5pt) Based on this number, can you claim progresa was effective (i.e. it increased schooling rate)? Interpret the number (in terms of percent points increase or decrease).
+
+On the basis of this number, I think I can claim that progresa was effective because it increased schooling rate by 3.88 percentage points compared with the non treated group. This means that the progresa led to a 3.88% increase in average schooling rate for poor villages that received progresa program.
+
+    5. (5pt) Implement the CS estimator using linear regression: regress the outcome after treatment on the treatment indicator. Do not include any other controls (except the intercept).
+    If you know how to do it the go ahead in your own way. But if you need a little help then you can follow these steps:
+    (a) Ensure you are only comparing the relevant groups: the control group that was not treated, and the treatment group that was actually treated.
+    (b) Create a dummy variable Tthat tells if someone is in the treatment or control group.
+    (c) Regress the outcome on T.
+    
+```{r}
+# Create a dataframe that only contains 1998 data and poor households
+regression_98_data <- progresa_data %>% 
+  filter(year == 98, poor == "pobre")
+# Create a linear regression model
+linear_regression <- lm(sc ~ progresa, data=regression_98_data)
+# Show the summary information
+summary(linear_regression)
+```
+    
+    6. (3pt) Compare the results. You should get exactly the same number as when just comparing the group means.
+    
+After comparison, the coefficient of the linear regression is the same number as the group means which is about 3.88 percentage point. This means that the progreasa villages were 3.88% higher average schooling rate. 
+    
+    7. (2pt) Is the effect statistically significant?
+    
+The effect is statistically significant as the p-value is less than a typical alpha value (i.e. 0.05).
+    
+    8. (5pt) Estimate the multiple regression model. Include all covariates, such as education, family size and whatever else you consider relevant for the current case.
+    
+    
+```{r}
+# Create a multi regression model by adding more relevant variables
+multi_regression <- lm(sc ~ progresa + sex + indig + dist_sec + grc + fam_n + min_dist + dist_cap + hohedu + hohwag + welfare_index + hohsex + hohage + age + sc97, data=regression_98_data)
+# Show the summary information
+summary(multi_regression)
+```
+    
+    9. (5pt) Compare the results. Do other covariates substantially change the results?
+
+After adding the covariates, we see that the percentage increase for the progresa program reduces from 3.88% to 3.26%. As we can see, there is a small difference between these two numbers which means that it is not substantially difference. This might suggest that the randomization is not perfect, even though the treatment does affect the schooling rate, there might be other factors that influence the result.
+
+# Before-After Estimator (40pt)
+
+Instead of comparing treatment and control villages in 1998, we can also compare just treatment villages after (1998) and before (1997) the program was introduced. We follow fairly similar steps as what you did above.
+
+    1. (3pt) What is the identifying assumption behind this estimator? Do you think they are fullfilled? Explain!
+    
+The underlying assumption is that E[ϵ|year == 97] = E[ϵ|year == 98]. We assume that the error term is unrelated to the time period we considered, which is 1997 and 1998. In other words, we are assuming that there is no temporal difference (before and after the progresa program) in schooling. Under this assumption, now the only factor we introduced is the progresa program itself. Therefore, the difference in average schooling before and after the campaign can be viewed as caused by the progresa program.
+    
+    2. (3pt) Why do we have to select only progresa villages and only poor for this task?
+    
+As mentioned, we only look at poor households because the progresa program is only available for poor families. We look at only progresa villages because for the before and after estimator, we assume there is no temporal difference in schooling. We are comparing whether the treatment villages in 1997 and 1998 have any differences before and after they received the progresa program.
+    
+    3. (4pt) compute average schooling rate (variable sc) for the poor for the treated villages before and after the program. Compare these means. How big effect do you find?
+    Hint: it should be 2.38 pct points.
+    
+```{r}
+# Compute the average schooling rate for the poor for the treated villages before the program
+avg_sc_treated_97_ba  <- progresa_data %>%
+  filter(poor == "pobre", year == 97, progresa == "basal") %>%
+  summarise(mean = mean(sc, na.rm = T))
+# Compute the average schooling rate for the poor for the treated villages after the program
+avg_sc_treated_98_ba <- progresa_data %>%
+  filter(poor == "pobre", year == 98, progresa == "basal") %>%
+  summarise(mean = mean(sc, na.rm = T))
+# Calculate the difference
+diff <- (avg_sc_treated_98_ba - avg_sc_treated_97_ba)*100
+print(paste("The effect is:", diff))
+```
+After calculation, the effect is about 2.38 which is the difference in means between the treated progresa poor villages in 1997 and after 1998 after the campaign.
+
+    4. (5pt) Based on this number, can you claim progresa was effective (i.e. it increased schooling rate)? Interpret the number (in terms of percent points increase or decrease).
+    
+Based on this number, I can claim that progresa was effective. This is because the average schooling rate in progresa poor villages before and after the campaign is 2.38% which indicates that the campaign has been fairly successul as the average schooling rate in the progresa poor village has increased by about 2.38% after the campaign.
+    
+    5. (5pt) Implement the BA estimator using linear regression: regress the outcome for the treated group on the after-program indicator. Do not include any other controls (except the intercept).
+    If you know how to do it the go ahead in your own way. But if you need a little help then you can follow these steps:
+    (a) Ensure you are only comparing the relevant groups: the control group is before and treatment group is after the policy was implemented.
+    (b) Create a dummy variable After that tells if we are looking the period were the policy is already there.
+    (c) Regress the outcome on After.
+    
+```{r}
+# Create a dataframe that contains poor and progresa 
+poor_progresa_data <- progresa_data %>% 
+  filter(poor == "pobre", progresa == "basal") %>%
+  # Here the variable has changed from a double type to a character type because dummy variable. However, changing the type or create a dummie variable does not change the coefficient after experimenting. It only changes the intercept.
+  mutate(ba = as.character(year))
+# Create a linear regression model
+linear_regression_ba <- lm(sc ~ ba, data = poor_progresa_data)
+# Show the summary information
+summary(linear_regression_ba)
+```
+    
+    6. (2pt) Compare the results. You should get exactly the same number as when just comparing the group means.
+    
+After comparison, the coefficient for year of the linear regression is the same number as the group means which is about 3.88 percentage point. This can be interpreted as there was a 2.38% increase in the average schooling rate before and after the campaign started in the treatment group of poor villages.
+
+    7. (3pt) Is the effect statistically significant?
+    
+The effect is statistically significant as the p-value is less than a typical alpha value (i.e. 0.05).
+    
+    8. (5pt) Estimate the multiple regression model. Include all covariates, such as education, family size and whatever else you consider relevant for the current case.
+    
+```{r}
+# Create a multi regression model by adding other relevant variables
+multi_regression_ba <- lm(sc ~ year + dist_sec + fam_n + hohedu, data = poor_progresa_data)
+# Show the summary information
+summary(multi_regression_ba)
+```
+    
+    9. (5pt) Compare the results. Do other covariates substantially change the results?
+    
+As we see from the new model with other variables included, the percentage increases from 2.38% to 2.40%. As we can see, there is a really small difference between the numbers which means that the other covariates did not substantially change the results. However, adding more relevant covariates may change the result of the coefficient for the year more. 
+    
+    10. (5pt) Comment the identifying assumptions behind the CS and BA models. Which one do you find more convincing?
+    
+Personally, I found the identifying assumption for the before and after estimator is more convincing as we assume there is no temporal difference in schooling. We are comparing whether the treatment villages in 1997 and 1998 have any differences before and after they received the progresa program. It makes more sense to see the difference before and after treatment villages receive the progresa program rather than comparing the progresa and non-progresa villages.
+    
+# Finally How much time spent on this PS?
+
+I spent about 6 hours on this problem set.
